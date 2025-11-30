@@ -14,15 +14,13 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Inisialisasi Session State (Memori Aplikasi)
 if 'jd_input' not in st.session_state:
     st.session_state['jd_input'] = ""
 if 'analysis_result' not in st.session_state:
     st.session_state['analysis_result'] = ""
 if 'current_view_id' not in st.session_state:
-    st.session_state['current_view_id'] = None # None artinya sedang mode "New Chat"
+    st.session_state['current_view_id'] = None
 
-# CSS agar tombol sidebar terlihat seperti List Item (Full Width & Flat)
 st.markdown("""
     <style>
     section[data-testid="stSidebar"] .stButton button {
@@ -60,7 +58,6 @@ except Exception as e:
     st.error(f"Connection Error: {e}")
 
 # --- 2. FUNCTIONS ---
-
 def reset_app():
     """Fungsi untuk membersihkan layar (New Chat)"""
     st.session_state['jd_input'] = ""
@@ -69,8 +66,8 @@ def reset_app():
 
 def load_history(doc_data, doc_id):
     """Fungsi saat history diklik"""
-    st.session_state['jd_input'] = doc_data.get('job_snippet_full', '') # Load JD lama
-    st.session_state['analysis_result'] = doc_data.get('analysis', '')   # Load Hasil lama
+    st.session_state['jd_input'] = doc_data.get('job_snippet_full', '') 
+    st.session_state['analysis_result'] = doc_data.get('analysis', '') 
     st.session_state['current_view_id'] = doc_id
 
 # --- 3. SIDEBAR NAVIGATION ---
@@ -81,14 +78,11 @@ with st.sidebar:
     st.divider()
     st.markdown("### ⚙️ Database Admin")
     
-    # --- TAMBAHAN BARU: FITUR SEED DATA ---
     if st.button("🔄 Reset & Seed Database", help="Isi database dengan 5 kandidat contoh"):
         try:
-            # 1. Hapus Data Lama
             docs = db.collection("candidates").stream()
             for doc in docs: doc.reference.delete()
             
-            # 2. Masukkan 5 Kandidat Contoh
             dummies = [
                 {"name": "Budi Santoso", "role": "Backend Dev", "skills": "Python, Django, FastAPI, AWS, Docker, Kubernetes."},
                 {"name": "Siti Aminah", "role": "Java Dev", "skills": "Java, Spring Boot, Oracle, Banking Systems."},
@@ -101,30 +95,23 @@ with st.sidebar:
             st.rerun()
         except Exception as e:
             st.error(f"Error seeding: {e}")
-    # --------------------------------------
-
-    # Tombol Besar "New Analysis"
+            
     if st.button("➕ New Analysis", use_container_width=True):
         reset_app()
-        st.rerun() # Refresh halaman
+        st.rerun() 
 
     st.subheader("🕒 History")
     
-    # Ambil data dari Firestore
     try:
-        # Kita ambil snippet pendek untuk judul tombol
         docs = db.collection("analyzed_jobs").order_by("timestamp", direction=firestore.Query.DESCENDING).limit(10).stream()
         
         for doc in docs:
             data = doc.to_dict()
             doc_id = doc.id
             
-            # Buat Judul Pendek (Misal: "Senior Python Devel...")
             full_text = data.get('job_snippet', 'Untitled Job')
             short_title = (full_text[:25] + '..') if len(full_text) > 25 else full_text
             
-            # Tampilkan sebagai Tombol
-            # Jika tombol ini diklik, jalankan fungsi load_history
             if st.button(f"📄 {short_title}", key=doc_id):
                 load_history(data, doc_id)
                 st.rerun()
@@ -133,15 +120,12 @@ with st.sidebar:
         st.caption("No History")
 
 # --- 4. MAIN CONTENT ---
-
-# 1. Buat Kolom dulu
 col_input, col_output = st.columns([1, 1.2], gap="large")
 
 # === KOLOM KIRI: INPUT ===
 with col_input:
     st.subheader("📥 Job Description")
 
-    # Text Area
     jd_text = st.text_area(
         "Input Job Description:",
         value=st.session_state['jd_input'],
@@ -150,17 +134,11 @@ with col_input:
         key="input_area"
     )
 
-    # --- PERBAIKAN DI SINI ---
-    # Kita simpan tombol ke dalam variabel bernama 'analyze_btn'
-    # Agar bisa dipanggil di logika utama nanti
     analyze_btn = st.button("✨ Analyze Now", type="primary", use_container_width=True)
 
-
-# === LOGIKA UTAMA (Hanya jalan jika tombol diklik) ===
 if analyze_btn and jd_text:
-    st.session_state['jd_input'] = jd_text # Simpan input
+    st.session_state['jd_input'] = jd_text
     
-    # Tampilkan loading di area output
     with col_output:
         with st.status("🚀 Gemini 2.0 Flash sedang bekerja...", expanded=True) as status:
             try:
@@ -217,7 +195,6 @@ if analyze_btn and jd_text:
                 # --- STEP 2: RANKING KANDIDAT ---
                 st.write("2️⃣ Mencocokkan dengan Database (Gemini 2.0)...")
                 
-                # Import Regex untuk 'memotong' JSON dari teks sampah
                 import re 
 
                 candidates_ref = db.collection("candidates").stream()
@@ -234,7 +211,6 @@ if analyze_btn and jd_text:
                         
                         skill_text = cand.get('skills') or cand.get('resume_text') or "-"
                         
-                        # Prompt kita buat lebih galak (STRICT)
                         prompt_match = f"""
                         You are an HR Manager. Compare JD vs Candidate.
                         
@@ -248,8 +224,6 @@ if analyze_btn and jd_text:
                             res_match = model.generate_content(prompt_match)
                             raw_text = res_match.text
                             
-                            # --- PERBAIKAN UTAMA (REGEX) ---
-                            # Mencari pola apapun yang diapit kurung kurawal { ... }
                             match = re.search(r"\{.*\}", raw_text, re.DOTALL)
                             
                             if match:
@@ -266,7 +240,6 @@ if analyze_btn and jd_text:
                                 raise ValueError("Format JSON tidak ditemukan di output AI")
 
                         except Exception as e:
-                            # Tampilkan error aslinya supaya kita tau kenapa
                             rank_results.append({
                                 "Nama": cand.get('name'),
                                 "Role": cand.get('role'),
@@ -274,45 +247,38 @@ if analyze_btn and jd_text:
                                 "Alasan AI": f"Error: {str(e)}" 
                             })
                     
-                    # Simpan hasil ranking
                     if rank_results:
                         df_rank = pd.DataFrame(rank_results).sort_values(by="Match Score", ascending=False)
                         st.session_state['ranking_data'] = df_rank
                 
                 status.update(label="✅ Selesai! Menampilkan hasil...", state="complete", expanded=False)
                 
-                # --- KUNCI UTAMA: REFRESH OTOMATIS ---
                 st.rerun()
                 
             except Exception as e:
                 st.error(f"Error: {e}")
 
-# === KOLOM KANAN (OUTPUT DISPLAY) ===
 with col_output:
     st.subheader("📊 Hasil & Rekomendasi")
     
     # Cek apakah ada data di memori
     if st.session_state.get('analysis_result'):
         
-        # 1. AI ANALYSIS
         st.markdown("#### 📝 Analisis JD (AI)")
         with st.container(border=True, height=400):
             st.markdown(st.session_state['analysis_result'])
 
         st.divider()
 
-        # 2. TOP CANDIDATES
         st.markdown("#### 🏆 Top Candidates")
         
         ranking_data = st.session_state.get('ranking_data')
         
         if ranking_data is not None and not ranking_data.empty:
-            # Highlight Juara 1
             top = ranking_data.iloc[0]
             if top['Match Score'] > 75:
                 st.success(f"🌟 **Rekomendasi Utama:** {top['Nama']} ({top['Match Score']}/100)")
             
-            # Tabel
             st.dataframe(
                 ranking_data,
                 column_config={
