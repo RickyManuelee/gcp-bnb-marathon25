@@ -1,0 +1,6 @@
+streamlit
+google-cloud-aiplatform>=1.43.0
+google-cloud-firestore
+pandas
+protobuf>=3.20.3
+PyPDF2
